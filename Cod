@@ -1,0 +1,225 @@
+import os  
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+# Função para criar a navegação na sidebar
+def mostrar_pagina_selecionada():
+    pagina = st.sidebar.selectbox(
+        "Escolha uma Página:",
+        ["Dashboard: Uso de Linguagens", "Dashboard: Campos de Aplicação", "Dashboard: Tipo de Programa", "Dashboard: Registro de Software"],
+        index=0
+    )
+    return pagina
+
+# Diretório para salvar o arquivo
+diretorio = '/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Dashboard_streamlit'
+os.makedirs(diretorio, exist_ok=True)
+
+# Configuração do Streamlit
+st.set_page_config(page_title="Registros de Programas de Computador", layout="wide")
+
+# Exibir o título e o contexto adicional
+st.title("Análise dos Registros de Programas de Computador nas Instituições de Ensino Superior do Nordeste - no Ceará")
+
+# Carregar o arquivo CSV
+df = pd.read_csv("/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Cópia de Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv")
+
+# Função para tratar valores ausentes ou não informados
+def tratar_colunas(coluna):
+    return coluna.apply(
+        lambda x: ['não informado' if campo == '-' else campo.strip() for campo in x.split('/')] 
+        if isinstance(x, str) else ['não informado']
+    )
+
+df['Linguagem'] = tratar_colunas(df['Linguagem'])
+df['Campo de Aplicação'] = tratar_colunas(df['Campo de Aplicação'])
+df['Tipo Programa'] = tratar_colunas(df['Tipo Programa'])  # Tratando a coluna Tipo Programa
+
+# Função para contar a ocorrência de cada valor em uma coluna específica
+def contar_ocorrencias(dataframe, coluna):
+    ocorrencias = {}
+    for valores in dataframe[coluna]:
+        for valor in valores:
+            if valor in ocorrencias:
+                ocorrencias[valor] += 1
+            else:
+                ocorrencias[valor] = 1
+    return ocorrencias
+
+linguagens_contagem = contar_ocorrencias(df, 'Linguagem')
+campos_contagem = contar_ocorrencias(df, 'Campo de Aplicação')
+tipos_programa_contagem = contar_ocorrencias(df, 'Tipo Programa')  # Contagem para Tipo Programa
+
+# Função para exibir o dashboard de Uso de Linguagens
+def display_dashboard_uso_linguagens():
+    st.subheader("Uso de Linguagens de Programação")
+    
+    # Explicação do filtro na sidebar
+    st.sidebar.markdown(""" 
+    **Filtros para Uso de Linguagens de Programação**:
+    - **Selecione as Linguagens de Programação** (para o gráfico): Escolha as linguagens que deseja visualizar no gráfico. Se nenhuma linguagem for selecionada, todos os valores serão exibidos.
+    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    """)
+    
+    # Filtro da sidebar com seleção múltipla de linguagens, sem seleção inicial
+    linguagens = st.sidebar.multiselect(
+        "Selecione as Linguagens de Programação (para o gráfico):",
+        options=list(linguagens_contagem.keys()),
+        default=[]  # Nenhuma linguagem selecionada inicialmente
+    )
+
+    # Exibir gráfico de barras com valores filtrados
+    if linguagens:
+        linguagens_selecionadas = [linguagens_contagem.get(l, 0) for l in linguagens]
+        dados_grafico = pd.DataFrame({'Linguagem': linguagens, 'Contagem': linguagens_selecionadas})
+    else:
+        dados_grafico = pd.DataFrame({'Linguagem': list(linguagens_contagem.keys()), 'Contagem': list(linguagens_contagem.values())})
+
+    fig = px.bar(
+        dados_grafico,
+        x='Linguagem',
+        y='Contagem',
+        labels={'Linguagem': 'Linguagem de Programação', 'Contagem': 'Contagem'},
+        title="Distribuição das Linguagens de Programação",
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        # Filtros da sidebar para a tabela
+        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()))
+        linguagem_selecionada = st.sidebar.multiselect("Filtrar por Linguagem de Programação (para a tabela):", options=list(linguagens_contagem.keys()), default=[])  # Nenhuma linguagem selecionada inicialmente
+
+        # Filtrando a tabela
+        tabela = df[['Linguagem', 'Depósito', 'Sigla', 'Campo de Aplicação']].explode('Linguagem')
+        if periodo_selecionado != 'Todos':
+            tabela = tabela[tabela['Depósito'] == periodo_selecionado]
+
+        if linguagem_selecionada:
+            tabela = tabela[tabela['Linguagem'].isin(linguagem_selecionada)]
+
+        st.dataframe(tabela, height=370)
+
+# Função para exibir o dashboard de Campos de Aplicação
+def display_dashboard_campos():
+    st.subheader("Campos de Aplicação")
+    
+    # Explicação do filtro na sidebar
+    st.sidebar.markdown(""" 
+    **Filtros para Campos de Aplicação**:
+    - **Selecione os Campos de Aplicação** (para o gráfico): Escolha os campos de aplicação que deseja visualizar no gráfico. Se nenhum campo for selecionado, todos os valores serão exibidos.
+    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    """)
+    
+    # Filtro da sidebar com seleção múltipla de campos, sem seleção inicial
+    campos = st.sidebar.multiselect(
+        "Selecione os Campos de Aplicação (para o gráfico):",
+        options=list(campos_contagem.keys()),
+        default=[]  # Nenhum campo selecionado inicialmente
+    )
+    
+    # Exibir gráfico de barras com valores filtrados
+    if campos:
+        valores = [campos_contagem.get(campo, 0) for campo in campos]
+        dados_grafico = pd.DataFrame({'Campo de Aplicação': campos, 'Contagem': valores})
+    else:
+        dados_grafico = pd.DataFrame({'Campo de Aplicação': list(campos_contagem.keys()), 'Contagem': list(campos_contagem.values())})
+
+    fig = px.bar(
+        dados_grafico,
+        x='Campo de Aplicação',
+        y='Contagem',
+        labels={'Campo de Aplicação': 'Campos de Aplicação', 'Contagem': 'Contagem'},
+        title="Distribuição dos Campos de Aplicação",
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        # Filtros da sidebar para a tabela
+        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()))
+        campo_selecionado = st.sidebar.multiselect("Filtrar por Campo de Aplicação (para a tabela):", options=list(campos_contagem.keys()), default=[])  # Nenhum campo selecionado inicialmente
+
+        # Filtrando a tabela
+        tabela = df[['Campo de Aplicação', 'Depósito', 'Sigla', 'Linguagem']].explode('Campo de Aplicação')
+        if periodo_selecionado != 'Todos':
+            tabela = tabela[tabela['Depósito'] == periodo_selecionado]
+
+        if campo_selecionado:
+            tabela = tabela[tabela['Campo de Aplicação'].isin(campo_selecionado)]
+
+        st.dataframe(tabela, height=370)
+
+# Função para exibir o dashboard de Tipo de Programa com gráfico de pizza
+def display_dashboard_tipo_programa():
+    st.subheader("Tipo de Programa")
+    
+    # Explicação do filtro na sidebar
+    st.sidebar.markdown(""" 
+    **Filtros para Tipo de Programa**:
+    - **Selecione os Tipos de Programa** (para o gráfico): Escolha os tipos de programa que deseja visualizar no gráfico. Se nenhum tipo for selecionado, todos os valores serão exibidos.
+    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    """)
+    
+    # Filtro da sidebar com seleção múltipla de tipos de programa, sem seleção inicial
+    tipos = st.sidebar.multiselect(
+        "Selecione os Tipos de Programa (para o gráfico):",
+        options=list(tipos_programa_contagem.keys()),
+        default=[]  # Nenhum tipo de programa selecionado inicialmente
+    )
+
+    # Exibir gráfico de pizza com valores filtrados
+    if tipos:
+        valores = [tipos_programa_contagem.get(tipo, 0) for tipo in tipos]
+        dados_grafico = pd.DataFrame({'Tipo de Programa': tipos, 'Contagem': valores})
+    else:
+        dados_grafico = pd.DataFrame({'Tipo de Programa': list(tipos_programa_contagem.keys()), 'Contagem': list(tipos_programa_contagem.values())})
+
+    fig = px.pie(
+        dados_grafico,
+        names='Tipo de Programa',
+        values='Contagem',
+        title="Distribuição dos Tipos de Programa",
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Filtros da sidebar para a tabela
+    periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()))
+    tipo_programa_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[])  # Nenhum tipo selecionado inicialmente
+
+    # Filtrando a tabela
+    tabela = df[['Tipo Programa', 'Depósito', 'Sigla', 'Linguagem']].explode('Tipo Programa')
+    if periodo_selecionado != 'Todos':
+        tabela = tabela[tabela['Depósito'] == periodo_selecionado]
+
+    if tipo_programa_selecionado:
+        tabela = tabela[tabela['Tipo Programa'].isin(tipo_programa_selecionado)]
+
+    st.dataframe(tabela, height=370)
+
+# Função para exibir o dashboard de Registro de Software
+def display_dashboard_registro_software():
+    st.subheader("Registro de Software")
+    # Mais funcionalidades podem ser adicionadas conforme necessário
+    st.markdown("Em breve, mais análises estarão disponíveis.")
+
+# Navegação entre os dashboards
+pagina = mostrar_pagina_selecionada()
+
+if pagina == "Dashboard: Uso de Linguagens":
+    display_dashboard_uso_linguagens()
+elif pagina == "Dashboard: Campos de Aplicação":
+    display_dashboard_campos()
+elif pagina == "Dashboard: Tipo de Programa":
+    display_dashboard_tipo_programa()
+else:
+    display_dashboard_registro_software()
