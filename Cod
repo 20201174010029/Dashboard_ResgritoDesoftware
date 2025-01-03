@@ -1,8 +1,33 @@
+import time
 import os  
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import re
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import threading
+
+class FileChangeHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        if event.src_path == "/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv":
+            st.experimental_rerun()  # Atualiza a página do Streamlit
+
+def start_file_monitoring():
+    event_handler = FileChangeHandler()
+    observer = Observer()
+    observer.schedule(event_handler, path="/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv", recursive=False)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
+# Rodando o monitoramento do arquivo em um thread separado
+monitoring_thread = threading.Thread(target=start_file_monitoring, daemon=True)
+monitoring_thread.start()
 
 # Função para criar a navegação na sidebar
 def mostrar_pagina_selecionada():
@@ -25,7 +50,7 @@ st.set_page_config(page_title="Registros de Programas de Computador", layout="wi
 st.title("Análise dos Registros de Programas de Computador nas Instituições de Ensino Superior do Nordeste - no Ceará")
 
 # Carregar o arquivo CSV
-df = pd.read_csv("/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Cópia de Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv")
+df = pd.read_csv("/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv")
 
 # Função para tratar valores ausentes ou não informados
 def tratar_colunas(coluna):
@@ -108,62 +133,80 @@ def display_dashboard_uso_linguagens():
 
         st.dataframe(tabela, height=370)
 
-# Função para exibir o dashboard de Campos de Aplicação
+
+
+
+# FUNÇÃO PARA CAMPO DE APLICAÇÃO
+# :/ HIHIHI
+
+
+
+
+
 def display_dashboard_campos():
-    st.subheader("Campos de Aplicação")
-    
     # Explicação do filtro na sidebar
     st.sidebar.markdown(""" 
-    **Filtros para Campos de Aplicação**:
-    - **Selecione os Campos de Aplicação** (para o gráfico): Escolha os campos de aplicação que deseja visualizar no gráfico. Se nenhum campo for selecionado, todos os valores serão exibidos.
+    **Filtros para Tipo de Programa**:
+    - **Selecione os Tipos de Programa** (para o gráfico): Escolha os tipos de programa que deseja visualizar no gráfico. Se nenhum tipo for selecionado, todos os valores serão exibidos.
     - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
     """)
-    
-    # Filtro da sidebar com seleção múltipla de campos, sem seleção inicial
-    campos = st.sidebar.multiselect(
-        "Selecione os Campos de Aplicação (para o gráfico):",
-        options=list(campos_contagem.keys()),
-        default=[],  # Nenhum campo selecionado inicialmente
-        key="campos_multiselect"  # Adicionado key único
+
+    # Filtro da sidebar com seleção múltipla de tipos, sem seleção inicial
+    tipos = st.sidebar.multiselect(
+        "Selecione os Tipos de Programa (para o gráfico):",
+        options=list(tipos_programa_contagem.keys()),
+        default=[],  # Nenhum tipo selecionado inicialmente
+        key="tipos_multiselect"  # Adicionado key único
     )
-    
+
     # Exibir gráfico de barras com valores filtrados
-    if campos:
-        valores = [campos_contagem.get(campo, 0) for campo in campos]
-        dados_grafico = pd.DataFrame({'Campo de Aplicação': campos, 'Contagem': valores})
+    if tipos:
+        valores = [tipos_programa_contagem.get(tipo, 0) for tipo in tipos]
+        dados_grafico = pd.DataFrame({'Tipo de Programa': tipos, 'Contagem': valores})
     else:
-        dados_grafico = pd.DataFrame({'Campo de Aplicação': list(campos_contagem.keys()), 'Contagem': list(campos_contagem.values())})
+        dados_grafico = pd.DataFrame({'Tipo de Programa': list(tipos_programa_contagem.keys()), 'Contagem': list(tipos_programa_contagem.values())})
 
     fig = px.bar(
         dados_grafico,
-        x='Campo de Aplicação',
+        x='Tipo de Programa',
         y='Contagem',
-        labels={'Campo de Aplicação': 'Campos de Aplicação', 'Contagem': 'Contagem'},
-        title="Distribuição dos Campos de Aplicação",
-        color_discrete_sequence=px.colors.qualitative.G10
+        labels={'Tipo de Programa': 'Tipo de Programa', 'Contagem': 'Contagem'},
+        title="Distribuição dos Tipos de Programa",
+        color_discrete_sequence=px.colors.qualitative.Pastel1
     )
 
     col1, col2 = st.columns([3, 1])
     with col1:
         st.plotly_chart(fig, use_container_width=True)
 
+
     with col2:
-        # Filtros da sidebar para a tabela
+      # Filtros da sidebar para a tabela
         periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")  # Adicionado key único
-        campo_selecionado = st.sidebar.multiselect("Filtrar por Campo de Aplicação (para a tabela):", options=list(campos_contagem.keys()), default=[], key="campo_tabela_multiselect")  # Adicionado key único
+        tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")  # Adicionado key único
 
         # Filtrando a tabela
-        tabela = df[['Campo de Aplicação', 'Depósito', 'Sigla', 'Linguagem']].explode('Campo de Aplicação')
+        if 'Tipo Programa' in df.columns:
+            tabela = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+        else:
+            st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
+            tabela = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
+
         if periodo_selecionado != 'Todos':
             tabela = tabela[tabela['Depósito'] == periodo_selecionado]
 
-        if campo_selecionado:
-            tabela = tabela[tabela['Campo de Aplicação'].isin(campo_selecionado)]
+        if tipo_selecionado:
+            tabela = tabela[tabela['Tipo Programa'].isin(tipo_selecionado)]
 
-        st.dataframe(tabela, height=370)
+        # Exibir a tabela sem a coluna "Área"
+        if not tabela.empty:
+            st.dataframe(tabela, height=370)
+        else:
+            st.error("A tabela está vazia após a filtragem.")
 
 # Função para exibir o dashboard de Tipo de Programa
 def display_dashboard_tipo_programa():
+    area = pd.read_csv('/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/ Interpretações e possíveis traduções do campos de aplicação do PIAUÍ - (PI)/softwares_categorias.csv')
     st.subheader("Tipo de Programa")
     
     # Explicação do filtro na sidebar
@@ -201,22 +244,32 @@ def display_dashboard_tipo_programa():
     with col1:
         st.plotly_chart(fig, use_container_width=True)
 
+
     with col2:
-        # Filtros da sidebar para a tabela
-        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="tipo_programa_periodo_selectbox")  # Adicionado key único
-        tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_programa_tabela_multiselect")  # Adicionado key único
+      # Filtros da sidebar para a tabela
+        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")  # Adicionado key único
+        tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")  # Adicionado key único
 
         # Filtrando a tabela
-        tabela = df[['Tipo Programa', 'Depósito', 'Sigla', 'Campo de Aplicação']].explode('Tipo Programa')
+        if 'Tipo Programa' in df.columns:
+            tabela = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+        else:
+            st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
+            tabela = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
+
         if periodo_selecionado != 'Todos':
             tabela = tabela[tabela['Depósito'] == periodo_selecionado]
 
         if tipo_selecionado:
             tabela = tabela[tabela['Tipo Programa'].isin(tipo_selecionado)]
 
-        st.dataframe(tabela, height=370)
+        # Exibir a tabela sem a coluna "Área"
+        if not tabela.empty:
+            st.dataframe(tabela, height=370)
+        else:
+            st.error("A tabela está vazia após a filtragem.")
 
-import plotly.express as px
+
 
 # Exemplo de criação de um gráfico de barras
 def criar_grafico():
@@ -229,42 +282,41 @@ def criar_grafico():
     
     return fig
 
-import streamlit as st
 
-# Função para exibir o dashboard de Registro de Software
-import streamlit as st
 
-# Função para exibir o dashboard de Registro de Software
+# fUNÇÃO PARA EXIBI O RESISTRO DE SOFTWARE
 def display_dashboard_registro_software():
     st.subheader("Registro de Software")
     
     # Explicação do filtro na sidebar
     st.sidebar.markdown(""" 
     **Filtros para Registro de Software**:
-    - **Selecione os Registros de Software** (para o gráfico): Escolha os registros que deseja visualizar no gráfico. Se nenhum registro for selecionado, todos os valores serão exibidos.
+    - **Selecione a Sigla** (para o gráfico): Escolha as siglas dos programas que deseja visualizar no gráfico. Se nenhuma sigla for selecionada, todos os valores serão exibidos.
     - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
     """)
-    
-    # Filtro da sidebar com seleção múltipla de registros
-    registros = st.sidebar.multiselect(
-        "Selecione os Registros de Software (para o gráfico):",
-        options=list(tipos_programa_contagem.keys()),  # Ou use outras colunas, conforme necessário
-        default=[],  # Nenhum registro selecionado inicialmente
-        key="registros_multiselect"  # Adicionado key único
+
+    # Filtro da sidebar com seleção múltipla de siglas (Sigla)
+    siglas = st.sidebar.multiselect(
+        "Selecione a Sigla da universidade desejada(para a primeira tabela):",
+        options=df['Sigla'].unique(),  # Usando a coluna 'Sigla'
+        default=[],  # Nenhuma sigla selecionada inicialmente
+        key="siglas_multiselect"  # Adicionado key único
     )
 
-    # Filtros da sidebar para a tabela
+    # Filtros da sidebar para a tabela (mantendo o filtro por Período)
     periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="registro_periodo_selectbox")  # Adicionado key único
-    tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="registro_tabela_multiselect")  # Adicionado key único
 
     # Filtrando a tabela
-    tabela = df[['Título', 'Nome do Titular:', 'Nome do Autor','Linguagem', 'Depósito', 'Campo de Aplicação']].explode('Linguagem')
+    tabela = df[['Título', 'Nome do Titular:','Sigla', 'Nome do Autor', 'Linguagem', 'Depósito', 'Campo de Aplicação']].explode('Linguagem')
+    
     if periodo_selecionado != 'Todos':
         tabela = tabela[tabela['Depósito'] == periodo_selecionado]
 
-    if tipo_selecionado:
-        tabela = tabela[tabela['Tipo Programa'].isin(tipo_selecionado)]
-
+    if siglas:  # Aplica o filtro de siglas
+        tabela = tabela[tabela['Sigla'].isin(siglas)]
+    
+    # Remover siglas repetidas para aparecerem apenas uma vez
+    siglas_unicas = sorted(tabela['Sigla'].unique())  # Lista de siglas únicas
 
     # Texto explicativo ou descrição
     col1, col2 = st.columns([3, 1])
@@ -274,32 +326,30 @@ def display_dashboard_registro_software():
         with st.container():
              st.dataframe(tabela, height=370)
 
-
     with col2:
-              # Criação do contêiner para o texto descritivo
+        # Criação do contêiner para o texto descritivo
         with st.container():
-           st.markdown("""
-        <div style="height: 370px; overflow-y: scroll; padding: 10px; border: 1px solid #ddd; border-radius: 5px; 
-                    word-wrap: break-word; max-width: 100%; box-sizing: border-box; font-size: 1vw;">
-            <h3>Descrição do Dashboard de Registro de Software</h3>
-            <p>Este dashboard permite visualizar e filtrar informações relacionadas aos registros de software, com base em critérios como o tipo de programa, período (de acordo com o campo 'Depósito') e outros parâmetros relevantes. A tabela exibida contém informações detalhadas sobre o registro de software, incluindo:</p>
-            <ul>
-                <li><strong>Título</strong>: Nome do software registrado.</li>
-                <li><strong>Nome do Titular</strong>: Titular do registro do software.</li>
-                <li><strong>Nome do Autor</strong>: Autor do software.</li>
-                <li><strong>Linguagem</strong>: Linguagens de programação associadas ao software.</li>
-                <li><strong>Depósito</strong>: Período de registro.</li>
-                <li><strong>Campo de Aplicação</strong>: Áreas de aplicação do software.</li>
-            </ul>
-            <p>Utilize os filtros na barra lateral para ajustar as visualizações conforme suas necessidades.</p>
-        </div>
-        """, unsafe_allow_html=True)
+            st.markdown("""
+            <div style="height: 370px; overflow-y: scroll; padding: 10px; border: 1px solid #ddd; border-radius: 5px; 
+                        word-wrap: break-word; max-width: 100%; box-sizing: border-box; font-size: 1vw;">
+                <h3>Descrição do Dashboard de Registro de Software</h3>
+                <p>Este dashboard permite visualizar e filtrar informações relacionadas aos registros de software, com base em critérios como a sigla do programa, período (de acordo com o campo 'Depósito') e outros parâmetros relevantes. A tabela exibida contém informações detalhadas sobre o registro de software, incluindo:</p>
+                <ul>
+                    <li><strong>Título</strong>: Nome do software registrado.</li>
+                    <li><strong>Nome do Titular</strong>: Titular do registro do software.</li>
+                    <li><strong>Nome do Autor</strong>: Autor do software.</li>
+                    <li><strong>Linguagem</strong>: Linguagens de programação associadas ao software.</li>
+                    <li><strong>Depósito</strong>: Período de registro.</li>
+                    <li><strong>Campo de Aplicação</strong>: Áreas de aplicação do software.</li>
+                </ul>
+                <p>Utilize os filtros na barra lateral para ajustar as visualizações conforme suas necessidades.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
         # Espaço entre o texto e o botão
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
         # Botão de download sem link
-
         st.markdown("""
             <style>
             .stButton>button {
@@ -319,6 +369,7 @@ def display_dashboard_registro_software():
             </style>
         """, unsafe_allow_html=True)
         st.button("Baixar Dados (sem link)", key="download_button")
+
 
 
 pagina = mostrar_pagina_selecionada()
