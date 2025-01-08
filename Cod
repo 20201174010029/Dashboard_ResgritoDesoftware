@@ -8,6 +8,8 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import threading
 
+
+
 class FileChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path == "/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv":
@@ -51,6 +53,7 @@ st.title("Análise dos Registros de Programas de Computador nas Instituições d
 
 # Carregar o arquivo CSV
 df = pd.read_csv("/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv")
+area = pd.read_csv('/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/ Interpretações e possíveis traduções do campos de aplicação do PIAUÍ - (PI)/softwares_categorias.csv')
 
 # Função para tratar valores ausentes ou não informados
 def tratar_colunas(coluna):
@@ -87,11 +90,11 @@ def display_dashboard_uso_linguagens():
     st.sidebar.markdown(""" 
     **Filtros para Uso de Linguagens de Programação**:
     - **Selecione as Linguagens de Programação** (para o gráfico): Escolha as linguagens que deseja visualizar no gráfico. Se nenhuma linguagem for selecionada, todos os valores serão exibidos.
-    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período e linguagem de programação específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
     """)
     
     # Filtro da sidebar com seleção múltipla de linguagens, sem seleção inicial
-    linguagens = st.sidebar.multiselect(
+    linguagens = st.sidebar.multiselect( 
         "Selecione as Linguagens de Programação (para o gráfico):",
         options=list(linguagens_contagem.keys()),
         default=[],  # Nenhuma linguagem selecionada inicialmente
@@ -134,21 +137,13 @@ def display_dashboard_uso_linguagens():
         st.dataframe(tabela, height=370)
 
 
-
-
-# FUNÇÃO PARA CAMPO DE APLICAÇÃO
-# :/ HIHIHI
-
-
-
-
-
-def display_dashboard_campos():
+def display_dashboard_campos():    
+    st.subheader("Campos de Aplicação")
     # Explicação do filtro na sidebar
     st.sidebar.markdown(""" 
     **Filtros para Tipo de Programa**:
     - **Selecione os Tipos de Programa** (para o gráfico): Escolha os tipos de programa que deseja visualizar no gráfico. Se nenhum tipo for selecionado, todos os valores serão exibidos.
-    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    - **Para a tabela 2**: Permite filtrar os dados por um período específico e tipo de campo de aplicação selecionado, conforme os dados do CSV. Se 'Todos' for selecionado, todos os dados serão considerados.
     """)
 
     # Filtro da sidebar com seleção múltipla de tipos, sem seleção inicial
@@ -175,45 +170,62 @@ def display_dashboard_campos():
         color_discrete_sequence=px.colors.qualitative.Pastel1
     )
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.plotly_chart(fig, use_container_width=True)
+    col1, col2, col3 = st.columns([3.5, 1, 1])
 
+    # Exibir gráfico na primeira coluna (col1)
+    with col1:
+         st.plotly_chart(fig, use_container_width=True, height=700)
+
+    # Filtros da sidebar para a tabela
+    periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a segunda tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")  # Adicionado key único
+    tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a segunda tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")  # Adicionado key único
+
+    # Filtrando a primeira tabela (df1)
+    if 'Tipo Programa' in df.columns:
+        tabela1 = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+    else:
+        st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
+        tabela1 = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
+
+    if periodo_selecionado != 'Todos':
+        tabela1 = tabela1[tabela1['Depósito'] == periodo_selecionado]
+
+    if tipo_selecionado:
+        tabela1 = tabela1[tabela1['Tipo Programa'].isin(tipo_selecionado)]
+
+    # Filtro pela coluna 'Código' da segunda tabela (df2)
+    codigo_selecionado = st.sidebar.selectbox("Filtrar por Código (para a primeira tabela tabela):", options=['Todos'] + sorted(area['Código'].unique().tolist()), key="campo_codigo_selectbox")
+
+    # Filtrando a segunda tabela 
+    if codigo_selecionado != 'Todos':
+        tabela2 = area[area['Código'] == codigo_selecionado]
+    else:
+        tabela2 = area
 
     with col2:
-      # Filtros da sidebar para a tabela
-        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")  # Adicionado key único
-        tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")  # Adicionado key único
-
-        # Filtrando a tabela
-        if 'Tipo Programa' in df.columns:
-            tabela = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+        if not tabela2.empty:
+            st.dataframe(tabela2, height=410)
+            st.markdown("Tabela de Intrepreções")
         else:
-            st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
-            tabela = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
-
-        if periodo_selecionado != 'Todos':
-            tabela = tabela[tabela['Depósito'] == periodo_selecionado]
-
-        if tipo_selecionado:
-            tabela = tabela[tabela['Tipo Programa'].isin(tipo_selecionado)]
-
-        # Exibir a tabela sem a coluna "Área"
-        if not tabela.empty:
-            st.dataframe(tabela, height=370)
+            st.error("A segunda tabela está vazia após a filtragem.")
+    with col3:
+        if not tabela1.empty:
+            st.dataframe(tabela1, height=410)
+            st.markdown("Tabela de Dados")
         else:
-            st.error("A tabela está vazia após a filtragem.")
+            st.error("A primeira tabela está vazia após a filtragem.")
 
-# Função para exibir o dashboard de Tipo de Programa
+#########################
+
 def display_dashboard_tipo_programa():
-    area = pd.read_csv('/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/ Interpretações e possíveis traduções do campos de aplicação do PIAUÍ - (PI)/softwares_categorias.csv')
     st.subheader("Tipo de Programa")
     
     # Explicação do filtro na sidebar
     st.sidebar.markdown(""" 
     **Filtros para Tipo de Programa**:
     - **Selecione os Tipos de Programa** (para o gráfico): Escolha os tipos de programa que deseja visualizar no gráfico. Se nenhum tipo for selecionado, todos os valores serão exibidos.
-    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
+    - **Para a tabela 2**: Permite filtrar os dados por um período e tipo de programa específico, conforme a coluna de dados do CSV. Se 'Todos' for selecionado, todos os dados serão considerados.
+    - **Filtro por Código** (para a tabela 1): Permite filtrar os dados por um código específico.
     """)
     
     # Filtro da sidebar com seleção múltipla de tipos, sem seleção inicial
@@ -240,49 +252,52 @@ def display_dashboard_tipo_programa():
         color_discrete_sequence=px.colors.qualitative.Pastel1
     )
 
-    col1, col2 = st.columns([3, 1])
+    # Disposição das colunas: gráfico na primeira coluna (3 partes), tabelas na segunda (1 parte)
+    col1, col2, col3= st.columns([4, 1, 1])
     with col1:
         st.plotly_chart(fig, use_container_width=True)
 
+    df2 = pd.read_csv('/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/ Interpretações e possíveis traduções do campos de aplicação do PIAUÍ - (PI)/Tipo_de_programa_categorias.csv')
 
+
+    periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela 2):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")
+    tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela 2):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")
+
+    # Filtrando a tabela 1
+    if 'Tipo Programa' in df.columns:
+        tabela1 = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+    else:
+        st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
+        tabela1 = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
+
+    if periodo_selecionado != 'Todos':
+        tabela1 = tabela1[tabela1['Depósito'] == periodo_selecionado]
+
+    if tipo_selecionado:
+        tabela1 = tabela1[tabela1['Tipo Programa'].isin(tipo_selecionado)]
+
+    # Filtro por Código para a segunda tabela
+    codigo_selecionado = st.sidebar.selectbox("Filtrar por Código (para a tabela 1):", options=['Todos'] + sorted(df2['Código'].unique().tolist()), key="campo_codigo_selectbox")
+
+    # Filtrando a tabela 2
+    if codigo_selecionado != 'Todos':
+        tabela2 = df2[df2['Código'] == codigo_selecionado]
+    else:
+        tabela2 = df2
+
+    # Exibir as tabelas
     with col2:
-      # Filtros da sidebar para a tabela
-        periodo_selecionado = st.sidebar.selectbox("Filtrar por Período (Depósito) (para a tabela):", options=['Todos'] + sorted(df['Depósito'].unique().tolist()), key="campo_periodo_selectbox")  # Adicionado key único
-        tipo_selecionado = st.sidebar.multiselect("Filtrar por Tipo de Programa (para a tabela):", options=list(tipos_programa_contagem.keys()), default=[], key="tipo_tabela_multiselect")  # Adicionado key único
-
-        # Filtrando a tabela
-        if 'Tipo Programa' in df.columns:
-            tabela = df[['Tipo Programa', 'Depósito', 'Campo de Aplicação']].explode('Tipo Programa')
+        if not tabela2.empty:
+            st.dataframe(tabela2, height=410)
+            st.markdown("Tabela de interpretações")
         else:
-            st.error("A coluna 'Tipo Programa' não está presente no DataFrame.")
-            tabela = pd.DataFrame()  # Cria um DataFrame vazio para evitar erros posteriores
-
-        if periodo_selecionado != 'Todos':
-            tabela = tabela[tabela['Depósito'] == periodo_selecionado]
-
-        if tipo_selecionado:
-            tabela = tabela[tabela['Tipo Programa'].isin(tipo_selecionado)]
-
-        # Exibir a tabela sem a coluna "Área"
-        if not tabela.empty:
-            st.dataframe(tabela, height=370)
+            st.error("A tabela 1 está vazia após a filtragem.")
+    with col3:
+        if not tabela1.empty:
+            st.dataframe(tabela1, height=410)
+            st.markdown("Tabela de Dados")
         else:
-            st.error("A tabela está vazia após a filtragem.")
-
-
-
-# Exemplo de criação de um gráfico de barras
-def criar_grafico():
-    # Supondo que você tenha uma coluna 'Tipo Programa' no DataFrame 'df'
-    contagem = df['Tipo Programa'].value_counts().reset_index()
-    contagem.columns = ['Tipo Programa', 'Contagem']
-
-    # Criando o gráfico de barras
-    fig = px.bar(contagem, x='Tipo Programa', y='Contagem', title="Distribuição dos Tipos de Programa")
-    
-    return fig
-
-
+            st.error("A tabela 2 está vazia após a filtragem.")
 
 # fUNÇÃO PARA EXIBI O RESISTRO DE SOFTWARE
 def display_dashboard_registro_software():
@@ -291,9 +306,7 @@ def display_dashboard_registro_software():
     # Explicação do filtro na sidebar
     st.sidebar.markdown(""" 
     **Filtros para Registro de Software**:
-    - **Selecione a Sigla** (para o gráfico): Escolha as siglas dos programas que deseja visualizar no gráfico. Se nenhuma sigla for selecionada, todos os valores serão exibidos.
-    - **Filtro por Período** (para a tabela): Permite filtrar os dados por um período específico, conforme a coluna 'Depósito'. Se 'Todos' for selecionado, todos os dados serão considerados.
-    """)
+    - **Selecione a Sigla** (para a tabela 1): Escolha as siglas das instituição ou faculdade específica que deseja visualizar na tabela. Se nenhuma sigla for selecionada, todos os valores serão exibidos.""")
 
     # Filtro da sidebar com seleção múltipla de siglas (Sigla)
     siglas = st.sidebar.multiselect(
