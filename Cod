@@ -55,14 +55,32 @@ st.title("Análise dos Registros de Programas de Computador nas Instituições d
 df = pd.read_csv("/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/Registros Programas de Computador_IES_Nordeste - CEARÁ (CE).csv")
 area = pd.read_csv('/content/drive/MyDrive/Documentos_e_arquivos_relacionados_ao_TCC(registro_de_programas_de_computadores)/ Interpretações e possíveis traduções do campos de aplicação do PIAUÍ - (PI)/softwares_categorias.csv')
 
-# Função para tratar valores ausentes ou não informados
-def tratar_colunas(coluna):
-    return coluna.apply(
-        lambda x: ['não informado' if campo == '-' else campo.strip() 
-                   for campo in re.split(r'[,/]', x)]  # Divide por "," ou "/"
-        if isinstance(x, str) else ['não informado']
-    )
 
+##############################################################################################
+# Função para tratar valores ausentes ou não informados e aplicar substituições específicas
+def tratar_colunas(coluna):
+    def ajustar_valor(x):
+        if isinstance(x, str):
+            valores = [campo.strip() for campo in re.split(r'[,/]', x)]  # Divide por "," ou "/"
+            valores_ajustados = []
+            for campo in valores:
+                if campo.upper() in ['-', '-NÃO INFORMADO-']:
+                    valores_ajustados.append('Não Informado')
+                elif campo.upper() == 'R':
+                    valores_ajustados.append('RUBY')
+                elif campo.upper() == 'C':
+                    valores_ajustados.append('C#')
+                elif campo.upper() in ['JAVASCRIPT', 'JAVA SCRIPT','JAVASCRIPY']:
+                    valores_ajustados.append('JAVASCRIPT')
+                else:
+                    valores_ajustados.append(campo)
+            return valores_ajustados
+        else:
+            return none
+    return coluna.apply(ajustar_valor)
+########################################################################
+
+# Aplicando a função nas colunas
 df['Linguagem'] = tratar_colunas(df['Linguagem'])
 df['Campo de Aplicação'] = tratar_colunas(df['Campo de Aplicação'])
 df['Tipo Programa'] = tratar_colunas(df['Tipo Programa'])  # Tratando a coluna Tipo Programa
@@ -81,6 +99,9 @@ def contar_ocorrencias(dataframe, coluna):
 linguagens_contagem = contar_ocorrencias(df, 'Linguagem')
 campos_contagem = contar_ocorrencias(df, 'Campo de Aplicação')
 tipos_programa_contagem = contar_ocorrencias(df, 'Tipo Programa')  # Contagem para Tipo Programa
+#####################
+
+
 
 # Função para exibir o dashboard de Uso de Linguagens
 def display_dashboard_uso_linguagens():
@@ -133,9 +154,14 @@ def display_dashboard_uso_linguagens():
 
         if linguagem_selecionada:
             tabela = tabela[tabela['Linguagem'].isin(linguagem_selecionada)]
-
         st.dataframe(tabela, height=370)
+        st.markdown("Tabela de Dados")
 
+
+
+
+
+################################
 
 def display_dashboard_campos():    
     st.subheader("Campos de Aplicação")
@@ -167,7 +193,7 @@ def display_dashboard_campos():
         y='Contagem',
         labels={'Tipo de Programa': 'Tipo de Programa', 'Contagem': 'Contagem'},
         title="Distribuição dos Tipos de Programa",
-        color_discrete_sequence=px.colors.qualitative.Pastel1
+        color_discrete_sequence=px.colors.qualitative.T10_r
     )
 
     col1, col2, col3 = st.columns([3.5, 1, 1])
@@ -346,7 +372,7 @@ def display_dashboard_registro_software():
             <div style="height: 370px; overflow-y: scroll; padding: 10px; border: 1px solid #ddd; border-radius: 5px; 
                         word-wrap: break-word; max-width: 100%; box-sizing: border-box; font-size: 1vw;">
                 <h3>Descrição do Dashboard de Registro de Software</h3>
-                <p>Este dashboard permite visualizar e filtrar informações relacionadas aos registros de software, com base em critérios como a sigla do programa, período (de acordo com o campo 'Depósito') e outros parâmetros relevantes. A tabela exibida contém informações detalhadas sobre o registro de software, incluindo:</p>
+                <p>Este dashboard permite visualizar e filtrar informações relacionadas aos registros de software, com base no critério relevante. A tabela exibida contém informações detalhadas sobre o registro de software, incluindo:</p>
                 <ul>
                     <li><strong>Título</strong>: Nome do software registrado.</li>
                     <li><strong>Nome do Titular</strong>: Titular do registro do software.</li>
@@ -394,3 +420,5 @@ elif pagina == "Dashboard: Tipo de Programa":
     display_dashboard_tipo_programa()
 elif pagina == "Dashboard: Registro de Software":
     display_dashboard_registro_software()
+
+#João Deybson ;)
